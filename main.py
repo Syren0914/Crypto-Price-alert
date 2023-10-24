@@ -1,34 +1,44 @@
-import pandas as pd
-import keys
-import requests
-from time import sleep
+from datetime import date, timedelta  # core python module
+import time
+import pandas as pd  # pip install pandas
+
+from send_email import send_email  
 
 
-def get_crypto_rates(base_currency = "USD", assets ="BTC,ETH,XRP"):
-    url = "https://pro-api.coinmarketcap.com"
+# Public GoogleSheets url - not secure!
+SHEET_ID = "1oxD_I4yzs_X0JbSKi9FtbSE6kZzwYkAjcMoVK-TO0SY" 
+SHEET_NAME = "Crypto_Price_alert"  
+URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
 
-    payload = {"key" : keys.COIN_MARKET_CAP_API_KEY, "convert":base_currency, "ids" : assets, "interval": "1d"}
-    response = requests.get(url, params=payload)
-    data =response.json()
-
-    crypto_currency, crypto_price , crypto_timestamp = [], [], []
-
-    
-
-    for asset in data:
-        crypto_currency.append(asset[currency])
-        crypto_price.append(asset['price'])
-        crypto_timestamp.append(asset['price_timestamp'])
-
-    raw_data = {
-        "assets": crypto_currency,
-        "rates": crypto_price,
-        "timestamp": crypto_timestamp
-    }
-    df = pd.DataFrame(raw_data)
-    print(df)
+def load_df(url):
+    parse_dates = ["reminder_date"]
+    df = pd.read_csv(url, parse_dates=parse_dates)
     return df
 
-get_crypto_rates()
 
+def query_data_and_send_emails(df):
+    present = date.today()
+    email_counter = 0
+    for _, row in df.iterrows():
+        if pd.notna(row["reminder_date"]) and (present >= row["reminder_date"].date()):
+            send_email(
+                subject=f'[Syren0914]',
+                receiver_email=row["Email"],
+                name=row["Name"],
+                Change=row["24H_Change"],
+    
+                Price=row["Price"],
+                
+            )
+            email_counter += 1
+    return f"Total Emails Sent: {email_counter}"
+
+
+while True:
+    df = load_df(URL)
+    result = query_data_and_send_emails(df)
+    print(result)
+
+    # Sleep for 24 hours before checking again
+    time.sleep(24 * 60 * 60)  # Sleep for 24 hours
